@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "NutriWise",
   "homepage": "index.html",
-  "categories": [CATEGORIES],
+  "categories": ["health", "food", "lifestyle", "fitness"],
   "api": {
     "endpoint": "https://api.anthropic.com/v1/messages",
     "model": "claude-sonnet-4-20250514",
@@ -23,19 +23,19 @@
     "condiments"
   ],
   "rating_fields": {
-    "freq": { "label": "Times per day", "min": 1, "max": 10 },
-    "days": { "label": "Days per week", "min": 1, "max": 7 },
+    "freq":  { "label": "Times per day",                    "min": 1, "max": 10 },
+    "days":  { "label": "Days per week",                    "min": 1, "max": 7  },
     "score": { "label": "Experience (1=disagrees, 10=beneficial)", "min": 1, "max": 10 }
   },
   "bmi_categories": {
-    "underweight": { "range": "< 18.5", "portion_strategy": "generous" },
-    "healthy": { "range": "18.5 – 24.9", "portion_strategy": "standard" },
-    "overweight": { "range": "25 – 29.9", "portion_strategy": "moderate" },
-    "obese": { "range": ">= 30", "portion_strategy": "controlled" }
+    "underweight": { "range": "< 18.5",      "portion_strategy": "generous"   },
+    "healthy":     { "range": "18.5 – 24.9", "portion_strategy": "standard"   },
+    "overweight":  { "range": "25 – 29.9",   "portion_strategy": "moderate"   },
+    "obese":       { "range": ">= 30",        "portion_strategy": "controlled" }
   },
   "meal_plan_logic": {
-    "dinner": "High experience foods (score 7–10)",
-    "lunch": "Lower experience foods (score 1–4) scheduled here where possible",
+    "dinner":    "High experience foods (score 7–10)",
+    "lunch":     "Lower experience foods (score 1–4) scheduled here where possible",
     "breakfast": "Neutral / complementary foods"
   }
 }
