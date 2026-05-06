@@ -5,7 +5,7 @@
 // holds your API key and forwards requests. Replace API_URL below with
 // your proxy endpoint, or ask Claude to generate a Cloudflare Worker for you.
 
-const API_URL = "https://api.anthropic.com/v1/messages"; // ← replace with your proxy URL
+const API_URL = "const API_URL = "https://nutriwise-proxy.chriscarvill.workers.dev";
 
 const CATEGORIES = [
   { id: "snacks",     label: "Snacks & desserts",       icon: "ti-cookie" },
