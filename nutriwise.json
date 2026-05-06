@@ -1,0 +1,41 @@
+{
+  "name": "NutriWise",
+  "short_name": "NutriWise",
+  "description": "Personal food intelligence — suitability analysis, timing, triggers, and AI-powered meal planning based on your body metrics and food preferences.",
+  "version": "1.0.0",
+  "author": "NutriWise",
+  "homepage": "index.html",
+  "categories": [CATEGORIES],
+  "api": {
+    "endpoint": "https://api.anthropic.com/v1/messages",
+    "model": "claude-sonnet-4-20250514",
+    "note": "Requires Anthropic API key injected server-side or via a proxy. Do not expose API keys client-side in production."
+  },
+  "food_categories": [
+    "snacks",
+    "drinks",
+    "vegetables",
+    "fruits",
+    "legumes",
+    "starches",
+    "protein",
+    "dairy",
+    "condiments"
+  ],
+  "rating_fields": {
+    "freq": { "label": "Times per day", "min": 1, "max": 10 },
+    "days": { "label": "Days per week", "min": 1, "max": 7 },
+    "score": { "label": "Experience (1=disagrees, 10=beneficial)", "min": 1, "max": 10 }
+  },
+  "bmi_categories": {
+    "underweight": { "range": "< 18.5", "portion_strategy": "generous" },
+    "healthy": { "range": "18.5 – 24.9", "portion_strategy": "standard" },
+    "overweight": { "range": "25 – 29.9", "portion_strategy": "moderate" },
+    "obese": { "range": ">= 30", "portion_strategy": "controlled" }
+  },
+  "meal_plan_logic": {
+    "dinner": "High experience foods (score 7–10)",
+    "lunch": "Lower experience foods (score 1–4) scheduled here where possible",
+    "breakfast": "Neutral / complementary foods"
+  }
+}
