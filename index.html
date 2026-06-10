@@ -103,6 +103,17 @@
       color: var(--text);
       border: 0.5px solid var(--border);
     }
+    .nav-btn-health {
+      background: var(--green-lt);
+      color: var(--green-dk);
+      border: 1px solid var(--green);
+      font-weight: 600;
+    }
+    .nav-btn-health.active {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+    }
 
     .panel { display: none; }
     .panel.active { display: block; }
@@ -653,6 +664,9 @@
 <main class="app">
 
   <nav class="tabs" aria-label="App sections">
+    <button class="nav-btn nav-btn-health" onclick="switchTab('health')" id="tab-health">
+      <i class="ti ti-heart-rate-monitor" aria-hidden="true"></i>My Health
+    </button>
     <button class="nav-btn active" onclick="switchTab('body')" id="tab-body">
       <i class="ti ti-ruler-measure" aria-hidden="true"></i>My body
     </button>
@@ -670,9 +684,6 @@
     </button>
     <button class="nav-btn" onclick="switchTab('avoid')" id="tab-avoid">
       <i class="ti ti-ban" aria-hidden="true"></i>Avoid
-    </button>
-    <button class="nav-btn" onclick="switchTab('health')"  id="tab-health">
-      <i class="ti ti-heart-rate-monitor" aria-hidden="true"></i>My Health
     </button>
   </nav>
 
