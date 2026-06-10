@@ -91,8 +91,9 @@ function switchTab(t) {
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("panel-" + t).classList.add("active");
   document.getElementById("tab-" + t).classList.add("active");
-  if (t === "try")   renderTryList();
-  if (t === "avoid") renderAvoidList();
+  if (t === "try")    renderTryList();
+  if (t === "avoid")  renderAvoidList();
+  if (t === "health") renderHealthPanel();
 }
 
 // ── BMI calculation ──────────────────────────────────────────────────────────
@@ -665,9 +666,221 @@ function emailAvoidList() {
   openMailto("NutriWise — Foods to Avoid", lines.join("\n"));
 }
 
+// ── My Health panel ───────────────────────────────────────────────────────────
+
+let healthFlareMode = false; // false = normal, true = flare
+
+const HEALTH_DATA = {
+  traffic: {
+    avoid: [
+      { name: "Solo (& other full-sugar soft drinks)", note: "High fructose drives uric acid (joint inflammation) and disrupts gut microbiome. Acidic — irritates gut lining and diverticula." },
+      { name: "Processed & packaged snack foods", note: "Ultra-processed foods feed harmful gut bacteria, promote systemic inflammation, and stress the liver — all of which flow through to joints." },
+      { name: "Sausages, bacon & processed meats", note: "High in saturated fat, additives, and pro-inflammatory compounds. Hard on the gut without a gallbladder." },
+      { name: "Deep-fried foods", note: "Large fat loads are poorly managed without a gallbladder — bile can't be released in the controlled burst needed. Triggers cramping and gut inflammation." },
+      { name: "Large, high-fat meals", note: "Without a gallbladder, bile drips continuously rather than surging. Big fat loads overwhelm this — keep fat spread across small meals." },
+      { name: "Alcohol", note: "Damages gut lining, disrupts microbiome, and worsens diverticula inflammation. (Already avoided — noted here for completeness.)" },
+    ],
+    reduce: [
+      { name: "Pepsi Max (and diet soft drinks generally)", note: "Caffeine stimulates gut motility — speeds transit and can trigger cramps, especially without a gallbladder. Artificial sweeteners (aspartame) may disrupt gut microbiome. Carbonation adds gas pressure on diverticula. Worth reducing, particularly during flares." },
+      { name: "Refined white bread, white rice, pastries", note: "Rapid blood sugar spikes keep inflammatory markers elevated. Swap for wholegrain versions when gut is settled." },
+      { name: "Nightshades (tomatoes, capsicum, eggplant, potatoes)", note: "Evidence is mixed, but some people with joint and gut inflammation notice a real improvement when reducing these. Worth a trial elimination." },
+      { name: "Red meat (unprocessed)", note: "A couple of times per week is fine for most people, but daily consumption is associated with higher inflammatory markers." },
+      { name: "Full-fat dairy", note: "Inflammatory for some, neutral for others. Worth observing whether it correlates with cramps or joint flares." },
+      { name: "Caffeine generally", note: "Stimulates gut motility. Without a gallbladder this is more significant — can worsen cramping and urgency." },
+    ],
+    okay: [
+      { name: "Sparkling water (plain)", note: "Scratches the carbonation itch without sugar or artificial sweeteners. Best everyday soft drink swap." },
+      { name: "Herbal teas (peppermint, chamomile, ginger)", note: "Peppermint and chamomile are particularly gut-soothing. Ginger has mild anti-inflammatory properties." },
+      { name: "Plain yoghurt (small amounts)", note: "Probiotics support gut microbiome. Keep portions modest — full-fat versions bring a fat load challenge without a gallbladder." },
+      { name: "Eggs", note: "Good protein, easy on digestion. Scrambled or poached rather than fried keeps fat load low." },
+      { name: "White fish & lean chicken", note: "Low-fat protein — easier to digest without a gallbladder than fatty fish or red meat. Fine daily." },
+      { name: "Oats (rolled)", note: "Soluble fibre feeds good gut bacteria and helps regulate gut motility. Gentle on the gut. Good choice when settled." },
+    ],
+    good: [
+      { name: "Oily fish (salmon, sardines, mackerel)", note: "Omega-3 fatty acids directly counter the inflammatory pathways driving your joint pain. Aim for 2–3 servings per week. Smaller portions spread across the day are better tolerated without a gallbladder." },
+      { name: "Leafy greens (spinach, kale, silverbeet)", note: "High in antioxidants and anti-inflammatory compounds. Low fat load — easy on digestion without a gallbladder." },
+      { name: "Berries (blueberries, strawberries)", note: "Polyphenols with strong anti-inflammatory and antioxidant effects. Good snack — low sugar load relative to most fruits." },
+      { name: "Walnuts & flaxseed", note: "Plant-based omega-3s. Small amounts daily help shift the omega-6:omega-3 ratio, which drives joint inflammation." },
+      { name: "Olive oil (extra virgin)", note: "Anti-inflammatory fats. Use as your main cooking and dressing oil. Keep quantities modest — still a fat load without a gallbladder." },
+      { name: "Legumes (lentils, chickpeas, beans)", note: "Soluble fibre feeds good gut bacteria. When gut is settled — introduce gradually and in small amounts to avoid gas pressure on diverticula." },
+      { name: "Turmeric", note: "Curcumin has well-studied anti-inflammatory properties. Add to cooking, or a small amount in warm water. Pairs with black pepper for better absorption." },
+      { name: "Ginger", note: "Natural anti-inflammatory and digestive aid. Good in teas, cooking, or warm water. Particularly helpful for gut cramping." },
+    ],
+  },
+  drinks: [
+    { icon: "🚫", name: "Solo", verdict: "avoid", note: "Full sugar, high fructose, acidic. The clearest single change you can make — directly drives joint inflammation via uric acid, disrupts gut microbiome, and irritates diverticula." },
+    { icon: "⚠️", name: "Pepsi Max", verdict: "reduce", note: "No sugar, but caffeine stimulates gut motility (worsened without a gallbladder), artificial sweeteners may disrupt microbiome, and carbonation adds gut pressure. Reduce gradually — don't go cold turkey if it's a strong habit." },
+    { icon: "✅", name: "Plain sparkling water", verdict: "good", note: "The best direct swap. Gives the carbonation and cold drink sensation. Add a slice of lemon or lime to make it feel more like a 'drink'. Keep ice cold." },
+    { icon: "✅", name: "Herbal teas (cold or hot)", verdict: "good", note: "Peppermint — particularly soothing for gut cramps. Chamomile — calming and anti-inflammatory. Ginger — gut motility support and mild anti-inflammatory. Can be made in batches and served cold." },
+    { icon: "✅", name: "Water (plain)", verdict: "good", note: "Especially important when increasing fibre intake. Aim for 8+ glasses/day. Hydration directly affects gut motility and reduces pressure in diverticula." },
+  ],
+  normal: {
+    fibre: [
+      "Gradually increase soluble fibre — oats, legumes, fruit.",
+      "Include some insoluble fibre — wholegrains, cooked vegetables — to keep gut moving and reduce pressure in diverticula pouches.",
+      "Increase water intake alongside any fibre increase.",
+      "Small, regular meals are better than large ones — reduces bile load (no gallbladder) and gut pressure.",
+      "Introduce new high-fibre foods slowly, one at a time, so you can identify any triggers.",
+    ],
+    joints: [
+      "Prioritise oily fish 2–3 times per week — most direct dietary lever for joint inflammation.",
+      "Add turmeric and ginger to cooking regularly.",
+      "Swap seed oils (sunflower, canola, corn) for olive oil as your primary cooking fat.",
+      "Include walnuts or ground flaxseed daily — small amounts make a difference over weeks.",
+      "Reducing Solo is the highest-impact single change for uric acid and joint inflammation.",
+    ],
+    gallbladder: [
+      "Space meals at least 4 hours apart — continuous bile flow needs time to replenish.",
+      "Keep individual meal fat content low-to-moderate. Spread fat across the day rather than one big serving.",
+      "Avoid large, fatty meals — these overwhelm the continuous bile drip and cause cramping.",
+      "Fatty fish (salmon, sardines) is beneficial for joints — but eat in modest portions and not with other high-fat foods in the same meal.",
+      "Cook with small amounts of olive oil rather than deep frying or pan frying in excess oil.",
+    ],
+  },
+  flare: {
+    fibre: [
+      "During a flare, reduce insoluble fibre (wholegrains, raw vegetables, skins).",
+      "Stick to easy-to-digest, low-residue foods: white rice, white bread, cooked peeled vegetables, eggs, lean chicken.",
+      "Avoid legumes and raw salads until the flare settles — these add gas pressure.",
+      "Small sips of water frequently — stay hydrated but don't flood the gut.",
+      "Avoid Pepsi Max entirely during flares — caffeine and carbonation will worsen cramping.",
+    ],
+    joints: [
+      "During a gut flare, systemic inflammation is elevated — joint pain may worsen regardless of diet.",
+      "Focus on anti-inflammatory foods that are also gut-gentle: ginger tea, cooked salmon, olive oil.",
+      "Avoid Solo entirely — fructose worsens both gut and joint inflammation.",
+      "Keep meals very small and low-fat to reduce gut stress that feeds systemic inflammation.",
+    ],
+    gallbladder: [
+      "During a flare, fat tolerance is reduced further — keep meals very low fat.",
+      "Stick to lean protein: poached chicken, white fish, eggs.",
+      "Avoid dairy, fatty fish, and oils until the flare settles.",
+      "Small, frequent meals (every 3–4 hours) rather than any large meals.",
+      "Bone broth or diluted vegetable soup can be helpful — easy to digest and soothing.",
+    ],
+  },
+};
+
+function setFlareMode(isFlare) {
+  healthFlareMode = isFlare;
+  renderHealthPanel();
+}
+
+function renderHealthPanel() {
+  const el = document.getElementById("health-content");
+  if (!el) return;
+
+  const mode = healthFlareMode ? "flare" : "normal";
+  const modeData = HEALTH_DATA[mode];
+
+  // Traffic light rows
+  function trafficRows(items, dotClass) {
+    return items.map(item => `
+      <div class="traffic-row">
+        <div class="traffic-dot ${dotClass}"></div>
+        <div class="traffic-info">
+          <div class="traffic-name">${item.name}</div>
+          <div class="traffic-note">${item.note}</div>
+        </div>
+      </div>`).join("");
+  }
+
+  // Drink rows
+  const drinkRows = HEALTH_DATA.drinks.map(d => {
+    const pillCls = d.verdict === "avoid" ? "pill-red" : d.verdict === "reduce" ? "pill-amber" : "pill-green";
+    const pillTxt = d.verdict === "avoid" ? "Avoid" : d.verdict === "reduce" ? "Reduce" : "Good choice";
+    return `<div class="drink-row">
+      <div class="drink-icon">${d.icon}</div>
+      <div class="drink-info">
+        <div class="drink-name">${d.name} <span class="pill ${pillCls}" style="font-size:10px;margin-left:4px;">${pillTxt}</span></div>
+        <div class="drink-note">${d.note}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // Tip list
+  function tipList(tips, cls) {
+    return tips.map(t => `
+      <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:7px;">
+        <i class="ti ti-circle-check" style="color:var(--green);font-size:14px;flex-shrink:0;margin-top:1px;"></i>
+        <span style="font-size:12px;color:var(--muted);line-height:1.6;">${t}</span>
+      </div>`).join("");
+  }
+
+  const modeLabel = healthFlareMode
+    ? `<span class="pill pill-amber">Flare mode — settle &amp; protect</span>`
+    : `<span class="pill pill-green">Normal mode — maintain &amp; improve</span>`;
+
+  const flareNotice = healthFlareMode
+    ? `<div class="health-tip-box amber" style="margin-bottom:16px;">
+        <strong>⚠️ Flare mode is on.</strong> Guidance below is adjusted for when your gut is actively inflamed or cramping. Switch back to Normal once settled.
+      </div>`
+    : `<div class="health-tip-box" style="margin-bottom:16px;">
+        <strong>Your conditions at a glance:</strong> Diverticula · No gallbladder · Joint inflammation (gut-driven). All three are connected — managing gut inflammation is the common lever.
+      </div>`;
+
+  el.innerHTML = `
+    <div class="flare-toggle">
+      <button class="flare-btn ${!healthFlareMode ? "active-normal" : ""}" onclick="setFlareMode(false)">
+        <i class="ti ti-sun" style="display:block;font-size:16px;margin-bottom:3px;"></i>Normal — settled gut
+      </button>
+      <button class="flare-btn ${healthFlareMode ? "active-flare" : ""}" onclick="setFlareMode(true)">
+        <i class="ti ti-flame" style="display:block;font-size:16px;margin-bottom:3px;"></i>Flare — gut inflamed
+      </button>
+    </div>
+
+    ${flareNotice}
+
+    <!-- DRINKS -->
+    <div class="card">
+      <h2><i class="ti ti-glass" style="font-size:16px;vertical-align:-2px;margin-right:6px;"></i>Drinks guide</h2>
+      ${drinkRows}
+    </div>
+
+    <!-- TRAFFIC LIGHTS — only in normal mode -->
+    ${!healthFlareMode ? `
+    <div class="card">
+      <h2><i class="ti ti-traffic-lights" style="font-size:16px;vertical-align:-2px;margin-right:6px;"></i>Food traffic lights</h2>
+      <div class="health-section-title" style="margin-top:0;">🔴 Avoid</div>
+      ${trafficRows(HEALTH_DATA.traffic.avoid, "traffic-dot-red")}
+      <div class="health-section-title">🟡 Reduce</div>
+      ${trafficRows(HEALTH_DATA.traffic.reduce, "traffic-dot-amber")}
+      <div class="health-section-title">🟢 Good choices</div>
+      ${trafficRows(HEALTH_DATA.traffic.good, "traffic-dot-green")}
+      <div class="health-section-title">⚪ Okay</div>
+      ${trafficRows(HEALTH_DATA.traffic.okay, "traffic-dot-gray")}
+    </div>` : ""}
+
+    <!-- DIVERTICULA / FIBRE -->
+    <div class="card">
+      <h2><i class="ti ti-gut" style="font-size:16px;vertical-align:-2px;margin-right:6px;"></i>Gut &amp; diverticula</h2>
+      ${tipList(modeData.fibre)}
+    </div>
+
+    <!-- NO GALLBLADDER -->
+    <div class="card">
+      <h2><i class="ti ti-scale" style="font-size:16px;vertical-align:-2px;margin-right:6px;"></i>No gallbladder — key rules</h2>
+      ${tipList(modeData.gallbladder)}
+    </div>
+
+    <!-- JOINT INFLAMMATION -->
+    <div class="card">
+      <h2><i class="ti ti-activity" style="font-size:16px;vertical-align:-2px;margin-right:6px;"></i>Joint inflammation</h2>
+      ${tipList(modeData.joints)}
+    </div>
+
+    <div class="info-box" style="margin-top:4px;">
+      <i class="ti ti-info-circle" style="font-size:13px;vertical-align:-2px;margin-right:4px;"></i>
+      This guidance is personalised to your specific conditions (diverticula, no gallbladder, joint inflammation) and is for informational purposes. For medical nutrition advice, consult a dietitian or gastroenterologist.
+    </div>
+  `;
+}
+
 // ── Global exports & init ────────────────────────────────────────────────────
 
 window.switchTab         = switchTab;
+window.setFlareMode      = setFlareMode;
+window.renderHealthPanel = renderHealthPanel;
 window.calcBMI           = calcBMI;
 window.toggleCat         = toggleCat;
 window.addFood           = addFood;
