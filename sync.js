@@ -153,7 +153,10 @@ function queuePush() {
 }
 
 async function pullFromCloud() {
-  if (!currentUser) return;
+  if (!currentUser) {
+    alert("Pull failed: not logged in (currentUser is empty).");
+    return;
+  }
   try {
     const { data, error } = await supabaseClient
       .from("nutriwise_sync")
@@ -161,11 +164,21 @@ async function pullFromCloud() {
       .eq("user_id", currentUser.id)
       .maybeSingle();
 
-    if (error) { console.error("Sync pull failed:", error.message); return; }
-    if (!data) return; // nothing synced yet from this or any other device
+    if (error) {
+      alert("Sync pull failed: " + error.message);
+      console.error("Sync pull failed:", error);
+      return;
+    }
+    if (!data) {
+      alert("No cloud backup found yet for this account. This is expected the very first time — try Sync again after making a change, or this means push hasn't succeeded yet.");
+      return;
+    }
 
     const unlocked = await unlockEncryption(data.salt);
-    if (!unlocked) return;
+    if (!unlocked) {
+      alert("No passphrase entered — cancelled.");
+      return;
+    }
 
     const snapshot = await decryptPayload(data.iv, data.ciphertext);
     applySnapshot(snapshot);
@@ -179,6 +192,7 @@ async function pullFromCloud() {
     renderAvoidList();
     updateSyncUI();
   } catch (e) {
+    alert("Sync pull error: " + e.message + " (likely wrong passphrase — try again with the exact passphrase you set originally)");
     console.error("Sync pull error:", e);
   }
 }
