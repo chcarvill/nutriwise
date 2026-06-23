@@ -5,8 +5,8 @@
 // SETUP: replace these two values with your own Supabase project's details.
 // Both are safe to expose publicly — they are not secret keys. Real protection
 // comes from the Row Level Security policy on the nutriwise_sync table.
-const SUPABASE_URL = "YOUR_SUPABASE_URL_HERE";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE";
+const SUPABASE_URL = "https://ltqrqmbadgiujnclzdun.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_KdIfc4nKNrYjh5zy8VstmQ_TiCeXZPj";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
