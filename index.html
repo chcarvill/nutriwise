@@ -441,6 +441,17 @@
     }
     .btn-email i { font-size: 16px; }
 
+    .header-backup-btn {
+      width: auto;
+      margin-top: 0;
+      margin-left: auto;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    header { display: flex; align-items: center; }
+
     textarea {
       resize: vertical;
       min-height: 56px;
@@ -659,6 +670,9 @@
     <h1>NutriWise</h1>
     <p>Personal food intelligence &amp; meal planning</p>
   </div>
+  <button class="btn-email header-backup-btn" onclick="emailEverything()" title="Email yourself a full backup of all your data">
+    <i class="ti ti-mail"></i> Backup
+  </button>
 </header>
 
 <main class="app">

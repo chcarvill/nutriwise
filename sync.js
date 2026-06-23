@@ -275,7 +275,6 @@ function injectSyncButton() {
       color: #555;
     }
     .sync-btn.sync-active { border-color: #1D9E75; color: #1D9E75; }
-    header { display: flex; align-items: center; }
   `;
   document.head.appendChild(style);
 }
