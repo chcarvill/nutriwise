@@ -16,16 +16,19 @@ let foods = {};
 CATEGORIES.forEach(c => (foods[c.id] = []));
 let openCats = { snacks: true };
 let bodyData = {};
-let tryItems   = [];  // [{ name, reason }]
-let avoidItems = [];  // [{ name, reason }]
+let tryItems     = [];  // [{ name, reason }]
+let avoidItems   = [];  // [{ name, reason }]
+let triggerItems = [];  // [{ name, reason }] — situations/feelings that mean it's not really hunger
 
 // ── Local storage ────────────────────────────────────────────────────────────
 
-const LS_FOODS    = "nutriwise_foods";
-const LS_BODY     = "nutriwise_body";
-const LS_OPENCATS = "nutriwise_opencats";
-const LS_TRY      = "nutriwise_try";
-const LS_AVOID    = "nutriwise_avoid";
+const LS_FOODS         = "nutriwise_foods";
+const LS_BODY          = "nutriwise_body";
+const LS_OPENCATS      = "nutriwise_opencats";
+const LS_TRY           = "nutriwise_try";
+const LS_AVOID         = "nutriwise_avoid";
+const LS_TRIGGERS      = "nutriwise_triggers";
+const LS_TRIGGERS_SEED = "nutriwise_triggers_seeded";
 
 const MEAL_CYCLE = ["", "B", "L", "D", "LD"];
 const MEAL_LABELS = { "": "—", "B": "B", "L": "L", "D": "D", "LD": "LD" };
@@ -36,6 +39,7 @@ function saveToStorage() {
     localStorage.setItem(LS_OPENCATS, JSON.stringify(openCats));
     localStorage.setItem(LS_TRY,      JSON.stringify(tryItems));
     localStorage.setItem(LS_AVOID,    JSON.stringify(avoidItems));
+    localStorage.setItem(LS_TRIGGERS, JSON.stringify(triggerItems));
   } catch (e) {}
 }
 
@@ -66,6 +70,9 @@ function loadFromStorage() {
     if (tr) tryItems = JSON.parse(tr);
     const av = localStorage.getItem(LS_AVOID);
     if (av) avoidItems = JSON.parse(av);
+    const tg = localStorage.getItem(LS_TRIGGERS);
+    if (tg) triggerItems = JSON.parse(tg);
+    seedTriggersIfNeeded();
   } catch (e) {}
 }
 
@@ -94,6 +101,7 @@ function switchTab(t) {
   if (t === "try")    renderTryList();
   if (t === "avoid")  renderAvoidList();
   if (t === "health") renderHealthPanel();
+  if (t === "timing") renderTimingPanel();
 }
 
 // ── BMI calculation ──────────────────────────────────────────────────────────
@@ -688,6 +696,191 @@ function emailAvoidList() {
   openMailto("NutriWise — Foods & Drinks to Avoid", body);
 }
 
+// ── Timing — when not to eat ─────────────────────────────────────────────────
+// A growable checklist of situations/feelings that mean it's not really hunger.
+// The same list powers the quick check-in chips above it — there's only one
+// list to maintain. Pre-seeded once on first run (never re-seeded after that,
+// so deleting them all stays deleted).
+
+let activeCheckinIdx = null;
+
+const DEFAULT_TRIGGERS = [
+  { name: "Just ate",          reason: "Already had a meal recently." },
+  { name: "Bloated",           reason: "Gut already feels full or under pressure." },
+  { name: "Tired, not hungry", reason: "Tiredness often gets mistaken for hunger." },
+  { name: "Stressed",          reason: "Stress-eating isn't really about hunger." },
+  { name: "Bored",             reason: "Boredom eating isn't hunger either." },
+  { name: "Genuinely hungry",  reason: "The real green light to eat." },
+];
+
+// Built-in guidance for the pre-seeded triggers, keyed by lowercase name.
+// Custom triggers you add yourself fall back to whatever you write in "reason".
+// flareText overrides the normal text when Flare mode is on in My Health.
+const TRIGGER_DATA = {
+  "just ate": {
+    verdict: "wait",
+    text: "Give it at least 3–4 hours since your last meal before eating again — matches the portion-spacing guidance in Recommendations.",
+  },
+  "bloated": {
+    verdict: "wait",
+    text: "Eating on top of bloating piles more load onto a gut that's already struggling. Try water or a short walk first and check back in 30–60 minutes.",
+    flareText: "Flare mode is on in My Health — your gut's already inflamed. Eating now will likely worsen cramping. Hold off and stick to clear fluids until it settles.",
+  },
+  "tired, not hungry": {
+    verdict: "wait",
+    text: "Tiredness and hunger send similar signals. Try water, a short walk, or rest first — if hunger's still there afterwards, it's real.",
+  },
+  "stressed": {
+    verdict: "wait",
+    text: "Stress-eating rarely matches actual hunger. Try addressing the stress directly first — a short break, water, or a few slow breaths.",
+  },
+  "bored": {
+    verdict: "wait",
+    text: "Boredom often masquerades as hunger. Find something to occupy the next 15 minutes, then check back in.",
+  },
+  "genuinely hungry": {
+    verdict: "go",
+    text: "This is the green light — go ahead and eat. Check Portions or Recommendations for what and how much.",
+  },
+};
+
+function seedTriggersIfNeeded() {
+  if (!localStorage.getItem(LS_TRIGGERS_SEED)) {
+    if (!triggerItems.length) triggerItems = DEFAULT_TRIGGERS.map(t => ({ ...t }));
+    localStorage.setItem(LS_TRIGGERS_SEED, "1");
+    saveToStorage();
+  }
+}
+
+function renderCheckinChips() {
+  if (!triggerItems.length) {
+    return `<p style="font-size:12px;color:var(--muted);">Add a trigger below to start checking in against it.</p>`;
+  }
+  return triggerItems.map((item, idx) => {
+    const label = item.name && item.name.trim() ? item.name.trim() : `Trigger ${idx + 1}`;
+    const data  = TRIGGER_DATA[label.toLowerCase()];
+    const verdictCls = data && data.verdict === "go" ? "chip-go" : "chip-wait";
+    const active = activeCheckinIdx === idx;
+    return `<button class="checkin-chip${active ? " active " + verdictCls : ""}" onclick="selectCheckin(${idx})">${label}</button>`;
+  }).join("");
+}
+
+function renderCheckinVerdict() {
+  if (activeCheckinIdx === null || !triggerItems[activeCheckinIdx]) return "";
+  const item  = triggerItems[activeCheckinIdx];
+  const label = item.name && item.name.trim() ? item.name.trim() : "This trigger";
+  const data  = TRIGGER_DATA[label.toLowerCase()];
+
+  let verdict, text;
+  if (data) {
+    verdict = data.verdict;
+    text    = (data.flareText && healthFlareMode) ? data.flareText : data.text;
+  } else {
+    verdict = "wait";
+    text    = item.reason && item.reason.trim()
+      ? item.reason.trim()
+      : "You flagged this as a reason to hold off eating — worth pausing before you go ahead.";
+  }
+
+  const pillCls = verdict === "go" ? "pill-green" : "pill-amber";
+  const pillTxt = verdict === "go" ? "Go ahead"    : "Worth waiting";
+  const boxCls  = verdict === "go" ? ""            : "amber";
+
+  return `<div class="health-tip-box ${boxCls}" style="margin-top:14px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span class="pill ${pillCls}" style="font-size:10px;">${pillTxt}</span>
+      <strong style="font-size:12px;">${label}</strong>
+    </div>
+    ${text}
+  </div>`;
+}
+
+function selectCheckin(idx) {
+  activeCheckinIdx = (activeCheckinIdx === idx) ? null : idx;
+  const chipsEl   = document.getElementById("checkin-chips");
+  const verdictEl = document.getElementById("checkin-verdict");
+  if (chipsEl)   chipsEl.innerHTML   = renderCheckinChips();
+  if (verdictEl) verdictEl.innerHTML = renderCheckinVerdict();
+}
+
+function renderTriggerList() {
+  const el = document.getElementById("trigger-list");
+  if (!el) return;
+  if (!triggerItems.length) {
+    el.innerHTML = `<p style="font-size:13px;color:var(--muted);padding:8px 0;">No triggers added yet — tap below to start your checklist.</p>`;
+    return;
+  }
+  el.innerHTML = triggerItems.map((item, idx) => `
+    <div class="try-row">
+      <div class="try-fields">
+        <input class="try-food-input" type="text" placeholder="Situation or feeling…" value="${item.name || ""}"
+          oninput="updateTriggerItem(${idx},'name',this.value)" />
+        <textarea class="try-reason-input" placeholder="Why does this mean it's not really hunger? (optional)"
+          oninput="updateTriggerItem(${idx},'reason',this.value)">${item.reason || ""}</textarea>
+      </div>
+      <button class="try-del-btn" onclick="removeTriggerItem(${idx})" aria-label="Remove">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>`).join("");
+}
+
+function renderTimingPanel() {
+  const chipsEl   = document.getElementById("checkin-chips");
+  const verdictEl = document.getElementById("checkin-verdict");
+  if (chipsEl)   chipsEl.innerHTML   = renderCheckinChips();
+  if (verdictEl) verdictEl.innerHTML = renderCheckinVerdict();
+  renderTriggerList();
+}
+
+function addTriggerItem() {
+  triggerItems.push({ name: "", reason: "" });
+  renderTriggerList();
+  const chipsEl = document.getElementById("checkin-chips");
+  if (chipsEl) chipsEl.innerHTML = renderCheckinChips();
+  saveToStorage();
+}
+
+function removeTriggerItem(idx) {
+  triggerItems.splice(idx, 1);
+  if (activeCheckinIdx === idx) activeCheckinIdx = null;
+  else if (activeCheckinIdx !== null && activeCheckinIdx > idx) activeCheckinIdx--;
+  renderTimingPanel();
+  saveToStorage();
+}
+
+function updateTriggerItem(idx, field, val) {
+  triggerItems[idx][field] = val;
+  saveToStorage();
+  // Refresh chips/verdict live without re-rendering the list (keeps input focus)
+  if (field === "name") {
+    const chipsEl = document.getElementById("checkin-chips");
+    if (chipsEl) chipsEl.innerHTML = renderCheckinChips();
+  }
+  if (activeCheckinIdx === idx) {
+    const verdictEl = document.getElementById("checkin-verdict");
+    if (verdictEl) verdictEl.innerHTML = renderCheckinVerdict();
+  }
+}
+
+function buildTriggerListText() {
+  const valid = triggerItems.filter(t => t.name && t.name.trim());
+  if (!valid.length) return null;
+  const lines = ["NUTRIWISE — WHEN NOT TO EAT", "=".repeat(40), ""];
+  valid.forEach((t, i) => {
+    lines.push(`${i + 1}. ${t.name}`);
+    if (t.reason) lines.push(`   ${t.reason}`);
+    lines.push("");
+  });
+  lines.push("-".repeat(40), "Generated by NutriWise — for informational purposes only.", "Consult a qualified dietitian for personalised medical nutrition advice.");
+  return lines.join("\n");
+}
+
+function emailTriggerList() {
+  const body = buildTriggerListText();
+  if (!body) { alert("No triggers added yet."); return; }
+  openMailto("NutriWise — When Not to Eat", body);
+}
+
 // ── Combined backup email ────────────────────────────────────────────────────
 // Pulls together every section's data into one single email, using the same
 // builder functions the individual buttons use — so it always stays in sync
@@ -698,7 +891,8 @@ function emailEverything() {
     buildBodyDataText(),
     buildFoodsDataText(),
     buildTryListText(),
-    buildAvoidListText()
+    buildAvoidListText(),
+    buildTriggerListText()
   ].filter(Boolean); // drop any section with no data yet
 
   if (!sections.length) {
@@ -956,6 +1150,11 @@ window.addAvoidItem      = addAvoidItem;
 window.removeAvoidItem   = removeAvoidItem;
 window.updateAvoidItem   = updateAvoidItem;
 window.emailAvoidList    = emailAvoidList;
+window.selectCheckin     = selectCheckin;
+window.addTriggerItem    = addTriggerItem;
+window.removeTriggerItem = removeTriggerItem;
+window.updateTriggerItem = updateTriggerItem;
+window.emailTriggerList  = emailTriggerList;
 
 // Load persisted data then render
 loadFromStorage();
@@ -964,3 +1163,4 @@ loadBodyFromStorage();
 renderTryList();
 renderAvoidList();
 renderHealthPanel();
+renderTimingPanel();

@@ -10,7 +10,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_KdIfc4nKNrYjh5zy8VstmQ_TiCeXZPj";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const SYNC_KEYS = [LS_FOODS, LS_OPENCATS, LS_TRY, LS_AVOID, LS_BODY];
+const SYNC_KEYS = [LS_FOODS, LS_OPENCATS, LS_TRY, LS_AVOID, LS_BODY, LS_TRIGGERS];
 const LS_PASSPHRASE_FLAG = "nutriwise_sync_unlocked"; // marks "we have a derived key in memory this session"
 const LS_LAST_SYNCED_AT = "nutriwise_last_synced_at";
 
@@ -190,6 +190,7 @@ async function pullFromCloud() {
     renderFoods();
     renderTryList();
     renderAvoidList();
+    renderTimingPanel();
     updateSyncUI();
   } catch (e) {
     alert("Sync pull error: " + e.message + " (likely wrong passphrase — try again with the exact passphrase you set originally)");

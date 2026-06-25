@@ -572,6 +572,29 @@
       color: var(--red-dk) !important;
     }
 
+    /* ── Timing panel — quick check-in chips ─────────────── */
+    .checkin-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .checkin-chip {
+      padding: 9px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .checkin-chip:hover { border-color: var(--muted); }
+    .checkin-chip.active.chip-wait { background: var(--amber); border-color: var(--amber); color: #fff; }
+    .checkin-chip.active.chip-go   { background: var(--green); border-color: var(--green); color: #fff; }
+
     /* ── My Health panel ─────────────────────────────────── */
     .flare-toggle {
       display: flex;
@@ -698,6 +721,9 @@
     </button>
     <button class="nav-btn" onclick="switchTab('avoid')" id="tab-avoid">
       <i class="ti ti-ban" aria-hidden="true"></i>Avoid
+    </button>
+    <button class="nav-btn" onclick="switchTab('timing')" id="tab-timing">
+      <i class="ti ti-clock" aria-hidden="true"></i>Timing
     </button>
   </nav>
 
@@ -827,6 +853,10 @@
         Foods rated low (1–4) are scheduled at lunch; foods rated high (7–10) at dinner.
         Please ensure you space meals by at least <strong>4 hours</strong>.
       </p>
+      <div class="info-box" style="margin-top:10px;border-left:3px solid var(--amber);">
+        <i class="ti ti-clock" style="font-size:13px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>
+        <strong>Before eating to this plan:</strong> check the <strong>Timing</strong> tab — if you're not actually hungry, just ate, or feeling off, it's worth a look before following the schedule below.
+      </div>
     </div>
     <div id="mealplan-result"></div>
     <button class="btn-email" onclick="emailMealPlan()" style="margin-top:4px;">
@@ -872,6 +902,32 @@
   <!-- MY HEALTH PANEL -->
   <section class="panel" id="panel-health" aria-label="My health guidance">
     <div id="health-content"></div>
+  </section>
+
+  <!-- TIMING PANEL — when not to eat -->
+  <section class="panel" id="panel-timing" aria-label="When not to eat">
+    <div class="info-box" style="margin-bottom:14px;">
+      <i class="ti ti-clock" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>
+      <strong>When</strong> you eat matters as much as <strong>what</strong> you eat. Tap how you're feeling for a quick read on whether it's actually time to eat, and build your own checklist below over time.
+    </div>
+
+    <div class="card">
+      <h2><i class="ti ti-bulb" style="font-size:16px;vertical-align:-2px;margin-right:6px;" aria-hidden="true"></i>Quick check-in</h2>
+      <div class="checkin-chips" id="checkin-chips"></div>
+      <div id="checkin-verdict"></div>
+    </div>
+
+    <div class="card">
+      <h2><i class="ti ti-list-check" style="font-size:16px;vertical-align:-2px;margin-right:6px;" aria-hidden="true"></i>My checklist — when not to eat</h2>
+      <div id="trigger-list"></div>
+      <button class="add-food-btn" onclick="addTriggerItem()" style="margin-top:10px;">
+        <i class="ti ti-plus" style="font-size:14px;" aria-hidden="true"></i>Add a trigger
+      </button>
+    </div>
+
+    <button class="btn-email" onclick="emailTriggerList()">
+      <i class="ti ti-mail" aria-hidden="true"></i>Email this checklist
+    </button>
   </section>
 
 </main>
