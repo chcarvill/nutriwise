@@ -337,6 +337,41 @@
       flex-shrink: 0; transition: color 0.15s;
     }
     .try-del-btn:hover { color: var(--red); }
+
+    /* Foods to Avoid — grouped clusters */
+    .avoid-group-card {
+      background: var(--bg);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .avoid-group-header {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .avoid-group-name {
+      font-size: 13px;
+      font-weight: 600;
+      border-color: rgba(226,75,74,0.35) !important;
+    }
+    .avoid-group-items {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .avoid-item-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      padding-left: 10px;
+      border-left: 2px solid rgba(226,75,74,0.25);
+    }
+    .avoid-item-input { font-size: 12.5px; }
+    .avoid-add-item-btn { margin-top: 10px; }
     .food-row:last-of-type { border-bottom: none; }
     .num-input {
       width: 40px !important;
@@ -890,14 +925,13 @@
     <div class="info-box" style="margin-bottom:14px;background:var(--red-lt);color:var(--red-dk);border:0.5px solid rgba(226,75,74,0.3);">
       <i class="ti ti-ban" style="font-size:14px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>
       List foods <strong>and drinks</strong> you need to <strong>avoid</strong> — allergies, intolerances, or foods that don't agree with you.
+      Group related items together under one shared reason (e.g. a "Sugary drinks" group with Coke, Solo, energy drinks all listed inside it).
       Any matching food in <strong>My foods</strong> will be highlighted in red as a reminder.
     </div>
-    <div class="card">
-      <div id="avoid-list"></div>
-      <button class="add-food-btn" onclick="addAvoidItem()" style="margin-top:10px;border-color:rgba(226,75,74,0.4);color:var(--red-dk);">
-        <i class="ti ti-plus" style="font-size:14px;"></i>Add a food or drink to avoid
-      </button>
-    </div>
+    <div id="avoid-list"></div>
+    <button class="add-food-btn" onclick="addAvoidGroup()" style="margin-top:10px;margin-bottom:14px;border-color:rgba(226,75,74,0.4);color:var(--red-dk);">
+      <i class="ti ti-plus" style="font-size:14px;"></i>Add a group of foods/drinks to avoid
+    </button>
     <button class="btn-email" onclick="emailAvoidList()">
       <i class="ti ti-mail" aria-hidden="true"></i>Email this list
     </button>

@@ -17,7 +17,7 @@ CATEGORIES.forEach(c => (foods[c.id] = []));
 let openCats = { snacks: true };
 let bodyData = {};
 let tryItems     = [];  // [{ name, reason }]
-let avoidItems   = [];  // [{ name, reason }]
+let avoidGroups  = [];  // [{ name, reason, items: [foodName, ...] }] — a shared reason across a cluster of foods/drinks
 let triggerItems = [];  // [{ name, reason }] — situations/feelings that mean it's not really hunger
 
 // ── Local storage ────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ function saveToStorage() {
     localStorage.setItem(LS_FOODS,    JSON.stringify(foods));
     localStorage.setItem(LS_OPENCATS, JSON.stringify(openCats));
     localStorage.setItem(LS_TRY,      JSON.stringify(tryItems));
-    localStorage.setItem(LS_AVOID,    JSON.stringify(avoidItems));
+    localStorage.setItem(LS_AVOID,    JSON.stringify(avoidGroups));
     localStorage.setItem(LS_TRIGGERS, JSON.stringify(triggerItems));
   } catch (e) {}
 }
@@ -69,7 +69,7 @@ function loadFromStorage() {
     const tr = localStorage.getItem(LS_TRY);
     if (tr) tryItems = JSON.parse(tr);
     const av = localStorage.getItem(LS_AVOID);
-    if (av) avoidItems = JSON.parse(av);
+    if (av) avoidGroups = migrateAvoidData(JSON.parse(av));
     const tg = localStorage.getItem(LS_TRIGGERS);
     if (tg) triggerItems = JSON.parse(tg);
     seedTriggersIfNeeded();
@@ -166,10 +166,30 @@ function calcBMI() {
 
 // ── Avoid helpers ────────────────────────────────────────────────────────────
 
+// Old format was a flat array: [{ name, reason }]. New format is grouped:
+// [{ name: groupLabel, reason, items: [foodName, ...] }]. This converts old
+// saved data (or anything malformed) into the new shape so nobody's existing
+// avoid list disappears after the update.
+function migrateAvoidData(raw) {
+  if (!Array.isArray(raw)) return [];
+  const alreadyGrouped = raw.length === 0 || raw.every(g => Array.isArray(g.items));
+  if (alreadyGrouped) return raw;
+  // Old flat entries — each becomes its own single-item group, named after
+  // the food itself, so nothing is lost. User can merge them into clusters
+  // manually afterwards.
+  return raw
+    .filter(item => item && (item.name || item.reason))
+    .map(item => ({ name: item.name || "", reason: item.reason || "", items: [item.name || ""] }));
+}
+
 function getAvoidMatch(name) {
   if (!name || !name.trim()) return null;
   const lower = name.trim().toLowerCase();
-  return avoidItems.find(a => a.name && a.name.trim().toLowerCase() === lower) || null;
+  for (const group of avoidGroups) {
+    const hit = (group.items || []).find(i => i && i.trim().toLowerCase() === lower);
+    if (hit) return { reason: group.reason, groupName: group.name };
+  }
+  return null;
 }
 
 // ── Food library ─────────────────────────────────────────────────────────────
@@ -640,50 +660,85 @@ function emailTryList() {
 function renderAvoidList() {
   const el = document.getElementById("avoid-list");
   if (!el) return;
-  if (!avoidItems.length) {
-    el.innerHTML = `<p style="font-size:13px;color:var(--muted);padding:8px 0;">No foods added yet — tap below to build your avoidance list.</p>`;
+  if (!avoidGroups.length) {
+    el.innerHTML = `<p style="font-size:13px;color:var(--muted);padding:8px 0;">No groups added yet — tap below to build your avoidance list.</p>`;
     return;
   }
-  el.innerHTML = avoidItems.map((item, idx) => `
-    <div class="try-row">
-      <div class="try-fields">
-        <input class="try-food-input avoid-list-input" type="text" placeholder="Food name…" value="${item.name || ""}"
-          oninput="updateAvoidItem(${idx},'name',this.value)" />
-        <textarea class="try-reason-input" placeholder="Why avoid it? (e.g. triggers reflux, high sugar, intolerance…)"
-          oninput="updateAvoidItem(${idx},'reason',this.value)">${item.reason || ""}</textarea>
+  el.innerHTML = avoidGroups.map((group, gi) => `
+    <div class="avoid-group-card">
+      <div class="avoid-group-header">
+        <input class="try-food-input avoid-group-name" type="text" placeholder="Group name (e.g. Sugary drinks)…" value="${group.name || ""}"
+          oninput="updateAvoidGroup(${gi},'name',this.value)" />
+        <button class="try-del-btn" onclick="removeAvoidGroup(${gi})" aria-label="Remove group" title="Remove this whole group">
+          <i class="ti ti-trash"></i>
+        </button>
       </div>
-      <button class="try-del-btn" onclick="removeAvoidItem(${idx})" aria-label="Remove">
-        <i class="ti ti-x"></i>
+      <textarea class="try-reason-input" placeholder="Why avoid these? (shared reason, e.g. spikes blood sugar, triggers reflux…)"
+        oninput="updateAvoidGroup(${gi},'reason',this.value)">${group.reason || ""}</textarea>
+      <div class="avoid-group-items">
+        ${(group.items || []).map((name, ii) => `
+          <div class="avoid-item-row">
+            <input class="avoid-item-input" type="text" placeholder="Food or drink name…" value="${name || ""}"
+              oninput="updateAvoidGroupItem(${gi},${ii},this.value)" />
+            <button class="try-del-btn" onclick="removeAvoidGroupItem(${gi},${ii})" aria-label="Remove item">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>`).join("")}
+      </div>
+      <button class="add-food-btn avoid-add-item-btn" onclick="addAvoidGroupItem(${gi})">
+        <i class="ti ti-plus" style="font-size:13px;"></i>Add item to this group
       </button>
     </div>`).join("");
 }
 
-function addAvoidItem() {
-  avoidItems.push({ name: "", reason: "" });
+function addAvoidGroup() {
+  avoidGroups.push({ name: "", reason: "", items: [""] });
   renderAvoidList();
   saveToStorage();
 }
 
-function removeAvoidItem(idx) {
-  avoidItems.splice(idx, 1);
+function removeAvoidGroup(gi) {
+  avoidGroups.splice(gi, 1);
   renderAvoidList();
   saveToStorage();
   renderFoods(); // refresh My foods highlighting
 }
 
-function updateAvoidItem(idx, field, val) {
-  avoidItems[idx][field] = val;
+function updateAvoidGroup(gi, field, val) {
+  avoidGroups[gi][field] = val;
   saveToStorage();
-  renderFoods(); // refresh My foods highlighting live
+  renderFoods(); // refresh My foods highlighting live (reason may have changed)
+}
+
+function addAvoidGroupItem(gi) {
+  avoidGroups[gi].items.push("");
+  renderAvoidList();
+  saveToStorage();
+}
+
+function removeAvoidGroupItem(gi, ii) {
+  avoidGroups[gi].items.splice(ii, 1);
+  renderAvoidList();
+  saveToStorage();
+  renderFoods();
+}
+
+function updateAvoidGroupItem(gi, ii, val) {
+  avoidGroups[gi].items[ii] = val;
+  saveToStorage();
+  renderFoods();
 }
 
 function buildAvoidListText() {
-  const valid = avoidItems.filter(a => a.name && a.name.trim());
+  const valid = avoidGroups
+    .map(g => ({ ...g, items: (g.items || []).filter(i => i && i.trim()) }))
+    .filter(g => g.items.length || (g.name && g.name.trim()));
   if (!valid.length) return null;
   const lines = ["NUTRIWISE — FOODS & DRINKS TO AVOID", "=".repeat(40), ""];
-  valid.forEach((a, i) => {
-    lines.push(`${i + 1}. ${a.name}`);
-    if (a.reason) lines.push(`   Reason: ${a.reason}`);
+  valid.forEach((g, i) => {
+    lines.push(`${i + 1}. ${g.name || "(Unnamed group)"}`);
+    if (g.reason) lines.push(`   Reason: ${g.reason}`);
+    g.items.forEach(item => lines.push(`   • ${item}`));
     lines.push("");
   });
   lines.push("-".repeat(40), "Generated by NutriWise — for informational purposes only.", "Consult a qualified dietitian for personalised medical nutrition advice.");
@@ -1146,10 +1201,13 @@ window.addTryItem        = addTryItem;
 window.removeTryItem     = removeTryItem;
 window.updateTryItem     = updateTryItem;
 window.emailTryList      = emailTryList;
-window.addAvoidItem      = addAvoidItem;
-window.removeAvoidItem   = removeAvoidItem;
-window.updateAvoidItem   = updateAvoidItem;
-window.emailAvoidList    = emailAvoidList;
+window.addAvoidGroup         = addAvoidGroup;
+window.removeAvoidGroup      = removeAvoidGroup;
+window.updateAvoidGroup      = updateAvoidGroup;
+window.addAvoidGroupItem     = addAvoidGroupItem;
+window.removeAvoidGroupItem  = removeAvoidGroupItem;
+window.updateAvoidGroupItem  = updateAvoidGroupItem;
+window.emailAvoidList        = emailAvoidList;
 window.selectCheckin     = selectCheckin;
 window.addTriggerItem    = addTriggerItem;
 window.removeTriggerItem = removeTriggerItem;
