@@ -19,6 +19,8 @@ let bodyData = {};
 let tryItems     = [];  // [{ name, reason }]
 let avoidGroups  = [];  // [{ name, reason, items: [foodName, ...] }] — a shared reason across a cluster of foods/drinks
 let triggerItems = [];  // [{ name, reason }] — situations/feelings that mean it's not really hunger
+let whyAvoidItems = []; // [{ name, symptoms: [{ name, mechanism }] }] — specific items/categories with
+                         // recurring symptoms and the underlying scientific mechanism behind each one
 
 // ── Local storage ────────────────────────────────────────────────────────────
 
@@ -29,6 +31,7 @@ const LS_TRY           = "nutriwise_try";
 const LS_AVOID         = "nutriwise_avoid";
 const LS_TRIGGERS      = "nutriwise_triggers";
 const LS_TRIGGERS_SEED = "nutriwise_triggers_seeded";
+const LS_WHYAVOID      = "nutriwise_whyavoid";
 
 const MEAL_CYCLE = ["", "B", "L", "D", "LD"];
 const MEAL_LABELS = { "": "—", "B": "B", "L": "L", "D": "D", "LD": "LD" };
@@ -40,6 +43,7 @@ function saveToStorage() {
     localStorage.setItem(LS_TRY,      JSON.stringify(tryItems));
     localStorage.setItem(LS_AVOID,    JSON.stringify(avoidGroups));
     localStorage.setItem(LS_TRIGGERS, JSON.stringify(triggerItems));
+    localStorage.setItem(LS_WHYAVOID, JSON.stringify(whyAvoidItems));
   } catch (e) {}
 }
 
@@ -72,6 +76,8 @@ function loadFromStorage() {
     if (av) avoidGroups = migrateAvoidData(JSON.parse(av));
     const tg = localStorage.getItem(LS_TRIGGERS);
     if (tg) triggerItems = JSON.parse(tg);
+    const wa = localStorage.getItem(LS_WHYAVOID);
+    if (wa) whyAvoidItems = migrateWhyAvoidData(JSON.parse(wa));
     seedTriggersIfNeeded();
   } catch (e) {}
 }
@@ -98,10 +104,11 @@ function switchTab(t) {
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("panel-" + t).classList.add("active");
   document.getElementById("tab-" + t).classList.add("active");
-  if (t === "try")    renderTryList();
-  if (t === "avoid")  renderAvoidList();
-  if (t === "health") renderHealthPanel();
-  if (t === "timing") renderTimingPanel();
+  if (t === "try")      renderTryList();
+  if (t === "avoid")    renderAvoidList();
+  if (t === "whyavoid") renderWhyAvoidList();
+  if (t === "health")   renderHealthPanel();
+  if (t === "timing")   renderTimingPanel();
 }
 
 // ── BMI calculation ──────────────────────────────────────────────────────────
@@ -180,6 +187,18 @@ function migrateAvoidData(raw) {
   return raw
     .filter(item => item && (item.name || item.reason))
     .map(item => ({ name: item.name || "", reason: item.reason || "", items: [item.name || ""] }));
+}
+
+function migrateWhyAvoidData(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(item => item && typeof item === "object")
+    .map(item => ({
+      name: item.name || "",
+      symptoms: Array.isArray(item.symptoms)
+        ? item.symptoms.map(s => ({ name: (s && s.name) || "", mechanism: (s && s.mechanism) || "" }))
+        : []
+    }));
 }
 
 function getAvoidMatch(name) {
@@ -751,6 +770,108 @@ function emailAvoidList() {
   openMailto("NutriWise — Foods & Drinks to Avoid", body);
 }
 
+// ── Why Avoid? — the science behind recurring symptoms ───────────────────────
+// A separate list from "Foods to Avoid": each entry here is a specific food or
+// a broad category, and underneath it a growing set of symptoms you've
+// recurringly noticed — each with room to write out the actual scientific
+// mechanism behind why that symptom happens. This is the "evidence" layer:
+// somewhere to properly reason through *why* something's a no-go, rather than
+// just flagging that it is.
+
+function renderWhyAvoidList() {
+  const el = document.getElementById("whyavoid-list");
+  if (!el) return;
+  if (!whyAvoidItems.length) {
+    el.innerHTML = `<p style="font-size:13px;color:var(--muted);padding:8px 0;">No items added yet — tap below to start building out the science behind what you avoid.</p>`;
+    return;
+  }
+  el.innerHTML = whyAvoidItems.map((item, ii) => `
+    <div class="whyavoid-item-card">
+      <div class="avoid-group-header">
+        <input class="try-food-input avoid-group-name" type="text" placeholder="Food item or broad category (e.g. Sugary drinks, Refined sugar)…" value="${item.name || ""}"
+          oninput="updateWhyAvoidItem(${ii},'name',this.value)" />
+        <button class="try-del-btn" onclick="removeWhyAvoidItem(${ii})" aria-label="Remove item" title="Remove this item and all its symptoms">
+          <i class="ti ti-trash"></i>
+        </button>
+      </div>
+      <div class="whyavoid-symptoms">
+        ${(item.symptoms || []).map((s, si) => `
+          <div class="whyavoid-symptom-block">
+            <div class="whyavoid-symptom-header">
+              <input class="try-food-input whyavoid-symptom-name" type="text" placeholder="Symptom (e.g. Bloating, Energy crash, Joint flare)…" value="${s.name || ""}"
+                oninput="updateWhyAvoidSymptom(${ii},${si},'name',this.value)" />
+              <button class="try-del-btn" onclick="removeWhyAvoidSymptom(${ii},${si})" aria-label="Remove symptom">
+                <i class="ti ti-x"></i>
+              </button>
+            </div>
+            <textarea class="whyavoid-mechanism-input" placeholder="The precise scientific mechanism — what's actually happening physiologically to cause this symptom…"
+              oninput="updateWhyAvoidSymptom(${ii},${si},'mechanism',this.value)">${s.mechanism || ""}</textarea>
+          </div>`).join("")}
+      </div>
+      <button class="add-food-btn whyavoid-add-symptom-btn" onclick="addWhyAvoidSymptom(${ii})">
+        <i class="ti ti-plus" style="font-size:13px;"></i>Add a symptom
+      </button>
+    </div>`).join("");
+}
+
+function addWhyAvoidItem() {
+  whyAvoidItems.push({ name: "", symptoms: [{ name: "", mechanism: "" }] });
+  renderWhyAvoidList();
+  saveToStorage();
+}
+
+function removeWhyAvoidItem(ii) {
+  whyAvoidItems.splice(ii, 1);
+  renderWhyAvoidList();
+  saveToStorage();
+}
+
+function updateWhyAvoidItem(ii, field, val) {
+  whyAvoidItems[ii][field] = val;
+  saveToStorage();
+}
+
+function addWhyAvoidSymptom(ii) {
+  whyAvoidItems[ii].symptoms.push({ name: "", mechanism: "" });
+  renderWhyAvoidList();
+  saveToStorage();
+}
+
+function removeWhyAvoidSymptom(ii, si) {
+  whyAvoidItems[ii].symptoms.splice(si, 1);
+  renderWhyAvoidList();
+  saveToStorage();
+}
+
+function updateWhyAvoidSymptom(ii, si, field, val) {
+  whyAvoidItems[ii].symptoms[si][field] = val;
+  saveToStorage();
+}
+
+function buildWhyAvoidListText() {
+  const valid = whyAvoidItems
+    .map(item => ({ ...item, symptoms: (item.symptoms || []).filter(s => s.name && s.name.trim()) }))
+    .filter(item => (item.name && item.name.trim()) || item.symptoms.length);
+  if (!valid.length) return null;
+  const lines = ["NUTRIWISE — WHY AVOID? (THE SCIENCE)", "=".repeat(40), ""];
+  valid.forEach((item, i) => {
+    lines.push(`${i + 1}. ${item.name || "(Unnamed item)"}`);
+    item.symptoms.forEach(s => {
+      lines.push(`   • ${s.name}`);
+      if (s.mechanism) lines.push(`     ${s.mechanism}`);
+    });
+    lines.push("");
+  });
+  lines.push("-".repeat(40), "Generated by NutriWise — for informational purposes only.", "Consult a qualified dietitian for personalised medical nutrition advice.");
+  return lines.join("\n");
+}
+
+function emailWhyAvoidList() {
+  const body = buildWhyAvoidListText();
+  if (!body) { alert("No items added yet."); return; }
+  openMailto("NutriWise — Why Avoid?", body);
+}
+
 // ── Timing — when not to eat ─────────────────────────────────────────────────
 // A growable checklist of situations/feelings that mean it's not really hunger.
 // The same list powers the quick check-in chips above it — there's only one
@@ -947,6 +1068,7 @@ function emailEverything() {
     buildFoodsDataText(),
     buildTryListText(),
     buildAvoidListText(),
+    buildWhyAvoidListText(),
     buildTriggerListText()
   ].filter(Boolean); // drop any section with no data yet
 
